@@ -1,3 +1,6 @@
+import binascii, base58, hashlib
+
+
 PBKDF2_ROUNDS = 2048
 _trans_5C = bytes((x ^ 0x5C) for x in range(256))
 _trans_36 = bytes((x ^ 0x36) for x in range(256))
@@ -383,14 +386,28 @@ def to_eth_seed(mnemonic: str, passphrase: str = "") -> bytes:
     return stretched[:32]
 
 
-def to_btc_seed(mnemonic: str, passphrase: str = "") -> bytes:
-    passphrase = "mnemonic" + passphrase
+def to_btc_seed(mnemonic: str, passphrase: str = "") -> str:
+    passphrase = "" + passphrase
     mnemonic_bytes = mnemonic.encode("utf-8")
     passphrase_bytes = passphrase.encode("utf-8")
     stretched = pbkdf2_hmac(
-        "sha512", mnemonic_bytes, passphrase_bytes, PBKDF2_ROUNDS
+        "sha256", mnemonic_bytes, passphrase_bytes, PBKDF2_ROUNDS
     )
-    return stretched[:256]
+
+    master_key = stretched.hex().upper()
+
+    def wif(masterkey):
+        var80 = "80"+masterkey
+        var = hashlib.sha256(
+            binascii.unhexlify(
+                hashlib.sha256(
+                    binascii.unhexlify(var80)
+                ).hexdigest()
+            )
+        ).hexdigest()
+        return str(base58.b58encode(binascii.unhexlify(str(var80) + str(var[0:8]))), 'utf-8')
+
+    return wif(master_key)
 
 
 seed = "12345 12345 12345 12345 12345 12345 12345 12345 12345"
@@ -400,7 +417,7 @@ print("eth: ", eth_s_key)
 # result
 # 0xc5d5412349d66733f3beef726f2932290e711fd541d55c564030808365584ae3
 
-pk = to_btc_seed(seed)
-btc_s_key = pk.hex()
-print("btc: ", btc_s_key)
-# c5d5412349d66733f3beef726f2932290e711fd541d55c564030808365584ae357026a4b234d9b8f2be22c10c181f33494503f88af3573f21572006fb49ea8d1
+btc_wif = to_btc_seed(seed)
+print("btc wif: ", btc_wif)
+# result
+# 5KfSmEhzpWHFP5DMzbxMxNr45tUXehebZufCzFXQpSiFRC7hwo7
